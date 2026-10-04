@@ -1,0 +1,481 @@
+-------------------------------------------------------------------------------
+      name:  <unnamed>
+       log:  C:/Users/lcastillo/Music/TAREA 2/log/P3_regresion_cuantil.log
+  log type:  text
+ opened on:  28 Sep 2026, 22:53:27
+
+. 
+. * Estilo gráfico A (igual que los problemas anteriores)
+. set scheme s2color
+
+. graph set window fontface "Times New Roman"
+
+. global c1   "31 58 104"
+
+. global c2   "200 112 42"
+
+. global c3   "46 107 52"
+
+. global c4   "142 36 50"
+
+. global gtam "medsmall"
+
+. 
+. global fte_enigh "Fuente: elaboración propia con datos de la ENIGH (INEGI)."
+
+. global fte_enoe  "Fuente: elaboración propia con datos de la ENOE (INEGI), tr
+> imestres I y II."
+
+. 
+. * Interruptor: las regresiones cuantiles de la ENOE tardan
+. global corre_qreg 1
+
+. 
+. 
+. /*===========================================================================
+> ===
+>   Bases de trabajo: personas de 25 a 65 años con salario por hora válido
+>   ENIGH 2018 y 2024; ENOE 2006, 2016 y 2026 (trimestres I y II juntos)
+> =============================================================================
+> =*/
+. use year ln_w educ_anios edad mujer rural factor muestra_w ///
+>     using "$data/construidas/enigh_limpia_salarios.dta" if muestra_w & inlist
+> (year, 2018, 2024), clear
+
+. gen int edad2 = edad^2
+
+. gen byte enc = 1
+
+. tempfile enigh
+
+. save `enigh'
+file C:\Users\LCASTI~1\AppData\Local\Temp\ST_1ad8_000001.tmp saved as .dta
+    format
+
+. 
+. use year trimestre ln_w educ_anios edad mujer rural factor muestra_w ///
+>     using "$data/construidas/enoe_limpia_salarios.dta" ///
+>     if muestra_w & inlist(year, 2006, 2016, 2026) & inlist(trimestre, 1, 2), 
+> clear
+
+. gen int edad2 = edad^2
+
+. gen byte enc = 2
+
+. append using `enigh'
+
+. label var ln_w       "Log del salario por hora"
+
+. label var educ_anios "Años de escolaridad"
+
+. label var edad2      "Edad al cuadrado"
+
+. label var mujer      "Mujer"
+
+. label var rural      "Rural"
+
+. compress
+  variable factor was long now int
+  (1,574,472 bytes saved)
+
+. save "$data/construidas/p3_base.dta", replace
+file C:/Users/lcastillo/Music/TAREA 2/data/construidas/p3_base.dta saved
+
+. table (enc year), statistic(frequency) statistic(mean ln_w)
+
+-----------------------------------
+            |  Frequency       Mean
+------------+----------------------
+enc         |                      
+  1         |                      
+    year    |                      
+      2018  |     90,671   3.636852
+      2024  |    109,063   3.839616
+      Total |    199,734    3.74757
+  2         |                      
+    year    |                      
+      2006  |    207,729   3.899994
+      2016  |    186,612   3.804661
+      2026  |    193,161    4.05198
+      Total |    587,502   3.919683
+  Total     |                      
+    year    |                      
+      2006  |    207,729   3.899994
+      2016  |    186,612   3.804661
+      2018  |     90,671   3.636852
+      2024  |    109,063   3.839616
+      2026  |    193,161    4.05198
+      Total |    787,236   3.876015
+-----------------------------------
+
+. 
+. 
+. /*===========================================================================
+> ===
+>   3.3 (y 3.5) Cambio del log del salario por hora en cada cuantil, por sexo
+>   Percentiles 1 a 99 ponderados con el factor de expansión.
+> =============================================================================
+> =*/
+. tempname pf
+
+. tempfile cuant
+
+. postfile `pf' byte enc int year byte mujer byte q double valor using `cuant',
+>  replace
+(file C:\Users\LCASTI~1\AppData\Local\Temp\ST_1ad8_000002.tmp not found)
+
+. foreach e in 1 2 {
+  2.     levelsof year if enc == `e', local(anios)
+  3.     foreach a of local anios {
+  4.         forvalues s = 0/1 {
+  5.             quietly _pctile ln_w [pw = factor] if enc == `e' & year == `a'
+>  & mujer == `s', nquantiles(100)
+  6.             forvalues q = 1/99 {
+  7.                 post `pf' (`e') (`a') (`s') (`q') (r(r`q'))
+  8.             }
+  9.         }
+ 10.     }
+ 11. }
+2018 2024
+2006 2016 2026
+
+. postclose `pf'
+
+. use `cuant', clear
+
+. reshape wide valor, i(enc mujer q) j(year)
+(j = 2006 2016 2018 2024 2026)
+
+Data                               Long   ->   Wide
+-----------------------------------------------------------------------------
+Number of observations              990   ->   396         
+Number of variables                   5   ->   8           
+j variable (5 values)              year   ->   (dropped)
+xij variables:
+                                  valor   ->   valor2006 valor2016 ... valor202
+> 6
+-----------------------------------------------------------------------------
+
+. gen double d_18_24 = valor2024 - valor2018 if enc == 1
+(198 missing values generated)
+
+. gen double d_06_16 = valor2016 - valor2006 if enc == 2
+(198 missing values generated)
+
+. gen double d_16_26 = valor2026 - valor2016 if enc == 2
+(198 missing values generated)
+
+. save "$data/construidas/p3_cambio_cuantiles.dta", replace
+file C:/Users/lcastillo/Music/TAREA
+    2/data/construidas/p3_cambio_cuantiles.dta saved
+
+. 
+. * Resumen para el texto
+. list mujer q d_18_24 if enc == 1 & inlist(q, 10, 25, 50, 75, 90), noobs sepby
+> (mujer)
+
+  +------------------------+
+  | mujer    q     d_18_24 |
+  |------------------------|
+  |     0   10   .29850352 |
+  |     0   25   .23632412 |
+  |     0   50   .18705307 |
+  |     0   75   .16733125 |
+  |     0   90    .0892485 |
+  |------------------------|
+  |     1   10   .34032501 |
+  |     1   25   .29547707 |
+  |     1   50   .20829868 |
+  |     1   75   .14361472 |
+  |     1   90   .05400256 |
+  +------------------------+
+
+. list mujer q d_06_16 d_16_26 if enc == 2 & inlist(q, 10, 25, 50, 75, 90), noo
+> bs sepby(mujer)
+
+  +-------------------------------------+
+  | mujer    q      d_06_16     d_16_26 |
+  |-------------------------------------|
+  |     0   10    .08214744   .35395239 |
+  |     0   25   -.02593906   .32174364 |
+  |     0   50   -.11911763   .30492132 |
+  |     0   75   -.16017709   .26587798 |
+  |     0   90   -.24095183   .19803915 |
+  |-------------------------------------|
+  |     1   10    .02505847     .377002 |
+  |     1   25   -.03045424   .32715419 |
+  |     1   50   -.09047758   .25019315 |
+  |     1   75    -.2015852   .22331503 |
+  |     1   90   -.20478779   .14148501 |
+  +-------------------------------------+
+
+. 
+. * Gráficas: hombres y mujeres en el mismo renglón
+. local op "xlabel(0(10)100, labsize($gtam) nogrid) ylabel(, labsize($gtam) ang
+> le(horizontal) format(%3.2f) grid glcolor(gs14)) yline(0, lcolor(gs8)) graphr
+> egion(color(white)) plotregion(color(white) lcolor(none))"
+
+. foreach s in 0 1 {
+  2.     local tit = cond(`s' == 0, "Hombres", "Mujeres")
+  3.     twoway (line d_18_24 q if enc == 1 & mujer == `s', lcolor("$c1") lwidt
+> h(medthick)), ///
+>         title("`tit'", size($gtam) color(black)) ytitle("Cambio del log del s
+> alario por hora", size($gtam)) ///
+>         xtitle("Cuantil", size($gtam)) `op' name(g`s', replace) nodraw
+  4. }
+
+. graph combine g0 g1, rows(1) ycommon iscale(1) graphregion(color(white)) xsiz
+> e(6.5) ysize(3.4) ///
+>     note("Nota: diferencia entre 2024 y 2018 del percentil q del log del sala
+> rio por hora (pesos de enero de 2026); personas de 25 a 65 años" ///
+>          "con salario por hora válido; percentiles ponderados con el factor d
+> e expansión." ///
+>          "$fte_enigh", size(small) span)
+
+. graph export "$out/Fig_3_3_enigh_cambio_cuantiles.png", width(2400) replace
+file C:/Users/lcastillo/Music/TAREA
+    2/papers/output/Fig_3_3_enigh_cambio_cuantiles.png saved as PNG format
+
+. 
+. foreach s in 0 1 {
+  2.     local tit = cond(`s' == 0, "Hombres", "Mujeres")
+  3.     twoway (line d_06_16 q if enc == 2 & mujer == `s', lcolor("$c1") lwidt
+> h(medthick)) ///
+>            (line d_16_26 q if enc == 2 & mujer == `s', lcolor("$c2") lwidth(m
+> edthick) lpattern(dash)), ///
+>         title("`tit'", size($gtam) color(black)) ytitle("Cambio del log del s
+> alario por hora", size($gtam)) ///
+>         xtitle("Cuantil", size($gtam)) `op' legend(order(1 "2006-2016" 2 "201
+> 6-2026") rows(1) size(small) region(lcolor(white))) ///
+>         name(h`s', replace) nodraw
+  4. }
+
+. graph combine h0 h1, rows(1) ycommon iscale(1) graphregion(color(white)) xsiz
+> e(6.5) ysize(3.6) ///
+>     note("Nota: diferencia del percentil q del log del salario por hora (peso
+> s de enero de 2026) entre los años indicados; personas de 25 a 65" ///
+>          "años con salario por hora válido; percentiles ponderados con el fac
+> tor de expansión." ///
+>          "$fte_enoe", size(small) span)
+
+. graph export "$out/Fig_3_5_enoe_cambio_cuantiles.png", width(2400) replace
+file C:/Users/lcastillo/Music/TAREA
+    2/papers/output/Fig_3_5_enoe_cambio_cuantiles.png saved as PNG format
+
+. 
+. 
+. /*===========================================================================
+> ===
+>   3.4 (y 3.5) Regresión cuantil y MCO por año
+>   ln(w) = b0 + b1 escolaridad + b2 edad + b3 edad^2 + b4 rural + b5 mujer
+>   Cuantiles 1 a 99; errores estándar robustos; ponderado con el factor.
+> =============================================================================
+> =*/
+. if $corre_qreg {
+. use "$data/construidas/p3_base.dta", clear
+. tempname pq
+. tempfile coef
+. postfile `pq' byte enc int year byte q str10 var double(b se) using `coef', r
+> eplace
+(file C:\Users\LCASTI~1\AppData\Local\Temp\ST_1ad8_000003.tmp not found)
+. levelsof enc, local(encs)
+1 2
+. foreach e of local encs {
+  2.     levelsof year if enc == `e', local(anios)
+  3.     foreach a of local anios {
+  4.         * MCO (q = 0)
+.         quietly regress ln_w educ_anios edad edad2 rural mujer [pw = factor] 
+> if enc == `e' & year == `a'
+  5.         foreach v in educ_anios edad edad2 rural mujer {
+  6.             post `pq' (`e') (`a') (0) ("`v'") (_b[`v']) (_se[`v'])
+  7.         }
+  8.         forvalues q = 1/99 {
+  9.             quietly qreg ln_w educ_anios edad edad2 rural mujer [pw = fact
+> or] if enc == `e' & year == `a', ///
+>                 quantile(`=`q'/100') vce(robust)
+ 10.             foreach v in educ_anios edad edad2 rural mujer {
+ 11.                 post `pq' (`e') (`a') (`q') ("`v'") (_b[`v']) (_se[`v'])
+ 12.             }
+ 13.         }
+ 14.         di as res "Encuesta `e', año `a': listo"
+ 15.     }
+ 16. }
+2018 2024
+Encuesta 1, año 2018: listo
+Encuesta 1, año 2024: listo
+2006 2016 2026
+Encuesta 2, año 2006: listo
+Encuesta 2, año 2016: listo
+Encuesta 2, año 2026: listo
+. postclose `pq'
+. use `coef', clear
+. gen double lo = b - invnormal(0.975) * se
+. gen double hi = b + invnormal(0.975) * se
+. save "$data/construidas/p3_coeficientes.dta", replace
+file C:/Users/lcastillo/Music/TAREA 2/data/construidas/p3_coeficientes.dta
+    saved
+. }
+
+. 
+. 
+. /*===========================================================================
+> ===
+>   3.6 Coeficientes de escolaridad y de mujer por cuantil, con IC al 95% y MCO
+>   ENIGH: 2018 (izquierda) y 2024 (derecha); ENOE: 2016 y 2026
+> =============================================================================
+> =*/
+. use "$data/construidas/p3_coeficientes.dta", clear
+
+. list enc year var b se if q == 0 & inlist(var, "educ_anios", "mujer"), noobs 
+> sepby(enc year)
+
+  +--------------------------------------------------+
+  | enc   year          var            b          se |
+  |--------------------------------------------------|
+  |   1   2018   educ_anios    .09269316    .0009527 |
+  |   1   2018        mujer   -.21633412   .00763025 |
+  |--------------------------------------------------|
+  |   1   2024   educ_anios    .07928924    .0008283 |
+  |   1   2024        mujer    -.2232537   .00661134 |
+  |--------------------------------------------------|
+  |   2   2006   educ_anios    .08461932   .00059139 |
+  |   2   2006        mujer    -.1035188   .00523706 |
+  |--------------------------------------------------|
+  |   2   2016   educ_anios    .07212001   .00061761 |
+  |   2   2016        mujer   -.09765996   .00481447 |
+  |--------------------------------------------------|
+  |   2   2026   educ_anios    .05988564   .00064401 |
+  |   2   2026        mujer   -.10741345    .0048142 |
+  +--------------------------------------------------+
+
+. list enc year q var b if inlist(q, 10, 50, 90) & inlist(var, "educ_anios", "m
+> ujer"), noobs sepby(enc year var)
+
+  +-------------------------------------------+
+  | enc   year    q          var            b |
+  |-------------------------------------------|
+  |   1   2018   10   educ_anios    .09360722 |
+  |-------------------------------------------|
+  |   1   2018   10        mujer   -.36305446 |
+  |-------------------------------------------|
+  |   1   2018   50   educ_anios    .08731233 |
+  |-------------------------------------------|
+  |   1   2018   50        mujer   -.17005983 |
+  |-------------------------------------------|
+  |   1   2018   90   educ_anios    .09486557 |
+  |-------------------------------------------|
+  |   1   2018   90        mujer   -.10046291 |
+  |-------------------------------------------|
+  |   1   2024   10   educ_anios    .08021695 |
+  |-------------------------------------------|
+  |   1   2024   10        mujer   -.30350555 |
+  |-------------------------------------------|
+  |   1   2024   50   educ_anios    .07351195 |
+  |-------------------------------------------|
+  |   1   2024   50        mujer   -.18188056 |
+  |-------------------------------------------|
+  |   1   2024   90   educ_anios    .08256165 |
+  |-------------------------------------------|
+  |   1   2024   90        mujer   -.14324836 |
+  |-------------------------------------------|
+  |   2   2006   10   educ_anios    .07826663 |
+  |-------------------------------------------|
+  |   2   2006   10        mujer   -.13862352 |
+  |-------------------------------------------|
+  |   2   2006   50   educ_anios    .08230199 |
+  |-------------------------------------------|
+  |   2   2006   50        mujer   -.10292123 |
+  |-------------------------------------------|
+  |   2   2006   90   educ_anios    .08807973 |
+  |-------------------------------------------|
+  |   2   2006   90        mujer   -.08120529 |
+  |-------------------------------------------|
+  |   2   2016   10   educ_anios    .06129167 |
+  |-------------------------------------------|
+  |   2   2016   10        mujer   -.15153159 |
+  |-------------------------------------------|
+  |   2   2016   50   educ_anios    .06690384 |
+  |-------------------------------------------|
+  |   2   2016   50        mujer   -.10899427 |
+  |-------------------------------------------|
+  |   2   2016   90   educ_anios    .08239857 |
+  |-------------------------------------------|
+  |   2   2016   90        mujer   -.03473736 |
+  |-------------------------------------------|
+  |   2   2026   10   educ_anios      .053373 |
+  |-------------------------------------------|
+  |   2   2026   10        mujer   -.15538751 |
+  |-------------------------------------------|
+  |   2   2026   50   educ_anios    .05359373 |
+  |-------------------------------------------|
+  |   2   2026   50        mujer   -.11824282 |
+  |-------------------------------------------|
+  |   2   2026   90   educ_anios    .06965557 |
+  |-------------------------------------------|
+  |   2   2026   90        mujer   -.06765405 |
+  +-------------------------------------------+
+
+. 
+. foreach e in 1 2 {
+  2.     local a1 = cond(`e' == 1, 2018, 2016)
+  3.     local a2 = cond(`e' == 1, 2024, 2026)
+  4.     local ENC = cond(`e' == 1, "enigh", "enoe")
+  5.     foreach v in educ_anios mujer {
+  6.         local nom = cond("`v'" == "educ_anios", "Escolaridad", "Mujer")
+  7.         * misma escala vertical en los dos años de cada variable (cuantile
+> s 1 a 99 e IC)
+.         summarize lo if enc == `e' & inlist(year, `a1', `a2') & var == "`v'" 
+> & q > 0, meanonly
+  8.         local ymin = r(min)
+  9.         summarize hi if enc == `e' & inlist(year, `a1', `a2') & var == "`v
+> '" & q > 0, meanonly
+ 10.         local ymax = r(max)
+ 11.         foreach a in `a1' `a2' {
+ 12.             summarize b if enc == `e' & year == `a' & var == "`v'" & q == 
+> 0, meanonly
+ 13.             local mco = r(mean)
+ 14.             local ytit = cond(`a' == `a1', "Coeficiente", "")
+ 15.             twoway (rarea lo hi q if enc == `e' & year == `a' & var == "`v
+> '" & q > 0, color("$c1%25") lwidth(none)) ///
+>                    (line b q if enc == `e' & year == `a' & var == "`v'" & q >
+>  0, lcolor("$c1") lwidth(medthick)), ///
+>                 yline(`mco', lcolor("$c2") lpattern(dash) lwidth(medthick)) /
+> //
+>                 title("`nom', `a'", size(medsmall) color(black)) ytitle("`yti
+> t'", size(small) margin(r=2)) xtitle("Cuantil", size(small)) ///
+>                 xlabel(0(20)100, labsize(small) nogrid) yscale(range(`ymin' `
+> ymax')) ///
+>                 ylabel(#5, labsize(small) angle(horizontal) format(%4.2f) gri
+> d glcolor(gs14)) legend(off) ///
+>                 graphregion(color(white) margin(small)) plotregion(color(whit
+> e) lcolor(none)) name(k_`v'_`a', replace) nodraw
+ 16.         }
+ 17.     }
+ 18.     local fte = cond(`e' == 1, "$fte_enigh", "$fte_enoe")
+ 19.     graph combine k_educ_anios_`a1' k_educ_anios_`a2' k_mujer_`a1' k_mujer
+> _`a2', rows(2) iscale(0.9) imargin(small) ///
+>         graphregion(color(white)) xsize(6.5) ysize(5.5) ///
+>         note("Nota: coeficientes de la regresión cuantil del log del salario 
+> por hora sobre años de escolaridad, edad, edad al cuadrado," ///
+>              "rural y mujer; errores estándar robustos y factor de expansión.
+>  Línea continua: regresión cuantil; área sombreada:" ///
+>              "intervalo de confianza al 95%; línea discontinua naranja: coefi
+> ciente de MCO." ///
+>              "`fte'", size(vsmall) span)
+ 20.     graph export "$out/Fig_3_6_`ENC'_coeficientes_cuantiles.png", width(24
+> 00) replace
+ 21. }
+file C:/Users/lcastillo/Music/TAREA
+    2/papers/output/Fig_3_6_enigh_coeficientes_cuantiles.png saved as PNG
+    format
+file C:/Users/lcastillo/Music/TAREA
+    2/papers/output/Fig_3_6_enoe_coeficientes_cuantiles.png saved as PNG
+    format
+
+. 
+. log close
+      name:  <unnamed>
+       log:  C:/Users/lcastillo/Music/TAREA 2/log/P3_regresion_cuantil.log
+  log type:  text
+ closed on:  29 Sep 2026, 02:24:10
+-------------------------------------------------------------------------------
