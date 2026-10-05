@@ -1,1 +1,0 @@
-Carpeta para los archivos log impresos de Stata
