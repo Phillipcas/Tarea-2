@@ -1,0 +1,166 @@
+<title>Laboratorio de regresión cuantil</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=IBM+Plex+Sans:wght@400;500&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+:root{
+  --bg:#f4f5f8; --panel:#ffffff; --ink:#1b2130; --muted:#5b6475; --line:#d8dce5;
+  --acc:#1f3a68; --acc2:#c8702a; --acc3:#2e6b34; --pt:rgba(31,58,104,.28);
+  --serif:"Source Serif 4",Georgia,serif; --sans:"IBM Plex Sans",system-ui,sans-serif; --mono:"IBM Plex Mono",ui-monospace,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#11141b; --panel:#181c25; --ink:#e4e8f0; --muted:#9aa3b5; --line:#2c3342;
+  --acc:#8fb0ea; --acc2:#e79a5f; --acc3:#7fc187; --pt:rgba(143,176,234,.30); color-scheme:dark;}}
+:root[data-theme="dark"]{
+  --bg:#11141b; --panel:#181c25; --ink:#e4e8f0; --muted:#9aa3b5; --line:#2c3342;
+  --acc:#8fb0ea; --acc2:#e79a5f; --acc3:#7fc187; --pt:rgba(143,176,234,.30); color-scheme:dark;}
+body{background:var(--bg);color:var(--ink);font:15px/1.6 var(--sans);padding-inline:16px;padding-block:24px 40px}
+.wrap{max-width:1080px;margin:0 auto;display:grid;gap:22px}
+h1{font:600 clamp(26px,4vw,36px)/1.15 var(--serif);margin:0;text-wrap:balance}
+h2{font:600 20px/1.3 var(--serif);margin:0 0 8px}
+.lead{color:var(--muted);max-width:68ch;margin:6px 0 0}
+.grid{display:grid;grid-template-columns:minmax(0,300px) minmax(0,1fr);gap:22px}
+@media (max-width:820px){.grid{grid-template-columns:1fr}}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:18px}
+.ctl{display:grid;gap:6px;margin-bottom:16px}
+.ctl label{font-size:13px;color:var(--muted);display:flex;justify-content:space-between}
+.ctl label b{font:500 13px var(--mono);color:var(--ink)}
+input[type=range]{width:100%;accent-color:var(--acc)}
+select,button{font:inherit;padding:6px 10px;border:1px solid var(--line);border-radius:6px;background:var(--panel);color:var(--ink)}
+button{cursor:pointer}button:hover{border-color:var(--acc)}
+button:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+canvas{width:100%;display:block}
+.stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:12px}
+.stat{border-top:2px solid var(--line);padding-top:6px}
+.stat span{display:block;font-size:12px;color:var(--muted)}
+.stat b{font:500 18px var(--mono);font-variant-numeric:tabular-nums}
+.key{display:flex;flex-wrap:wrap;gap:14px;font-size:13px;color:var(--muted);margin-top:8px}
+.key i{display:inline-block;width:22px;height:0;border-top:3px solid;vertical-align:middle;margin-right:6px}
+.cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:22px}
+.cols p{margin:0 0 10px;max-width:65ch}
+.formula{font:14px var(--mono);background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:8px 10px;overflow-x:auto}
+</style>
+<div class="wrap">
+  <header>
+    <h1>Laboratorio de regresión cuantil</h1>
+    <p class="lead">Simula un salario con heteroscedasticidad y compara la regresión por MCO, que describe la media condicional, con la regresión cuantil, que describe cualquier cuantil τ de la distribución condicional. Mueve los controles para ver cómo cambia la pendiente estimada.</p>
+  </header>
+
+  <div class="grid">
+    <aside class="panel" aria-label="Controles de la simulación">
+      <div class="ctl"><label for="tau">Cuantil τ <b id="tauv">0.50</b></label><input id="tau" type="range" min="0.05" max="0.95" step="0.05" value="0.5"></div>
+      <div class="ctl"><label for="gam">Heteroscedasticidad γ <b id="gamv">0.15</b></label><input id="gam" type="range" min="0" max="0.4" step="0.01" value="0.15"></div>
+      <div class="ctl"><label for="n">Tamaño de muestra <b id="nv">400</b></label><input id="n" type="range" min="100" max="1500" step="50" value="400"></div>
+      <div class="ctl"><label for="dist">Distribución del error</label>
+        <select id="dist"><option value="normal">Normal</option><option value="t3">t de Student (3 g.l., colas pesadas)</option><option value="asim">Asimétrica (log-normal centrada)</option></select></div>
+      <button id="nueva" type="button">Nueva muestra</button>
+      <div class="formula" style="margin-top:16px">y = 1 + 0.5·x + (1 + γ·x)·ε</div>
+      <p style="font-size:13px;color:var(--muted);margin:10px 0 0">Con γ = 0 los errores son homocedásticos y todas las pendientes cuantiles coinciden con la de MCO. Con γ &gt; 0 la dispersión crece con x y las pendientes se separan.</p>
+    </aside>
+
+    <section class="panel" aria-label="Datos simulados y rectas ajustadas">
+      <h2>Datos simulados y rectas ajustadas</h2>
+      <canvas id="sc" height="360" role="img" aria-label="Diagrama de dispersión con la recta de MCO y la recta del cuantil elegido"></canvas>
+      <div class="key"><span><i style="border-color:var(--acc2);border-top-style:dashed"></i>MCO (media)</span><span><i style="border-color:var(--acc)"></i>Cuantil τ estimado</span><span><i style="border-color:var(--acc3);border-top-style:dotted"></i>Cuantil τ verdadero</span></div>
+      <div class="stats">
+        <div class="stat"><span>Pendiente MCO</span><b id="bols">–</b></div>
+        <div class="stat"><span>Pendiente cuantil τ</span><b id="bq">–</b></div>
+        <div class="stat"><span>Pendiente verdadera en τ</span><b id="btrue">–</b></div>
+      </div>
+    </section>
+  </div>
+
+  <section class="panel" aria-label="Pendiente por cuantil">
+    <h2>Pendiente estimada en cada cuantil</h2>
+    <canvas id="cf" height="260" role="img" aria-label="Pendiente estimada por cuantil frente a la pendiente de MCO"></canvas>
+    <div class="key"><span><i style="border-color:var(--acc)"></i>Regresión cuantil</span><span><i style="border-color:var(--acc3);border-top-style:dotted"></i>Valor verdadero</span><span><i style="border-color:var(--acc2);border-top-style:dashed"></i>MCO</span></div>
+  </section>
+
+  <section class="cols">
+    <div>
+      <h2>¿Qué estima?</h2>
+      <p>MCO minimiza la suma de residuos al cuadrado y estima E[y | x]. La regresión cuantil minimiza una suma de valores absolutos ponderados asimétricamente, ρ<sub>τ</sub>(u) = u·(τ − 1[u &lt; 0]), y estima el cuantil condicional Q<sub>τ</sub>(y | x).</p>
+      <p>Con τ = 0.5 es la regresión de la mediana. Con τ = 0.1 describe a quienes ganan poco dado x; con τ = 0.9, a quienes ganan mucho.</p>
+    </div>
+    <div>
+      <h2>¿Para qué sirve?</h2>
+      <p>Muestra si un regresor afecta de forma distinta a la parte baja y a la parte alta de la distribución: por ejemplo, si el premio a la escolaridad es mayor para los salarios altos. También es robusta a valores extremos de y, porque no eleva los residuos al cuadrado.</p>
+    </div>
+    <div>
+      <h2>¿Cómo leer la pendiente?</h2>
+      <p>β(τ) es el cambio en el cuantil τ de y cuando x aumenta en una unidad. En este modelo β(τ) = 0.5 + γ·F<sup>−1</sup>(τ): con más heteroscedasticidad, la pendiente de los cuantiles altos sube y la de los bajos baja, aunque la media condicional sea la misma.</p>
+    </div>
+  </section>
+</div>
+<script>
+const $=id=>document.getElementById(id);
+let seed=7;
+function rnd(){seed=(seed*1664525+1013904223)%4294967296;return seed/4294967296;}
+function norm(){let u=0,v=0;while(u===0)u=rnd();while(v===0)v=rnd();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);}
+function draw(dist){
+  if(dist==="t3"){const z=norm();let c=0;for(let i=0;i<3;i++){const w=norm();c+=w*w;}return z/Math.sqrt(c/3)/Math.sqrt(3);}
+  if(dist==="asim"){return (Math.exp(0.6*norm())-Math.exp(0.18))/0.7;}
+  return norm();
+}
+function qinv(dist,p){ // cuantil del error (numérico con muestra grande fija)
+  return QTAB[dist][Math.round(p*100)];
+}
+const QTAB={};
+function buildQ(){const s0=seed;seed=12345;["normal","t3","asim"].forEach(d=>{const a=[];for(let i=0;i<40000;i++)a.push(draw(d));a.sort((x,y)=>x-y);QTAB[d]=[];for(let k=0;k<=100;k++)QTAB[d][k]=a[Math.min(a.length-1,Math.max(0,Math.round(k/100*a.length)))];});seed=s0;}
+buildQ();
+let X=[],Y=[];
+function simular(){
+  const n=+$("n").value,g=+$("gam").value,d=$("dist").value;X=[];Y=[];
+  for(let i=0;i<n;i++){const x=10*rnd();X.push(x);Y.push(1+0.5*x+(1+g*x)*draw(d));}
+}
+function ols(){let n=X.length,sx=0,sy=0,sxx=0,sxy=0;for(let i=0;i<n;i++){sx+=X[i];sy+=Y[i];sxx+=X[i]*X[i];sxy+=X[i]*Y[i];}const b=(n*sxy-sx*sy)/(n*sxx-sx*sx);return[(sy-b*sx)/n,b];}
+function qreg(t){ // algoritmo MM (Hunter y Lange, 2000)
+  let [a,b]=ols();const n=X.length;
+  for(let it=0;it<80;it++){
+    let s0=0,s1=0,s2=0,t0=0,t1=0;
+    for(let i=0;i<n;i++){const r=Y[i]-a-b*X[i];const w=1/(1e-6+Math.abs(r));
+      s0+=w;s1+=w*X[i];s2+=w*X[i]*X[i];t0+=w*Y[i]+(2*t-1);t1+=w*X[i]*Y[i]+(2*t-1)*X[i];}
+    const det=s0*s2-s1*s1;const na=(s2*t0-s1*t1)/det,nb=(s0*t1-s1*t0)/det;
+    if(Math.abs(na-a)+Math.abs(nb-b)<1e-7){a=na;b=nb;break;}a=na;b=nb;}
+  return[a,b];
+}
+function css(v){return getComputedStyle(document.documentElement).getPropertyValue(v).trim();}
+function prep(c){const r=c.getBoundingClientRect(),dpr=window.devicePixelRatio||1;c.width=r.width*dpr;c.height=+c.getAttribute("height")*dpr;const ctx=c.getContext("2d");ctx.setTransform(dpr,0,0,dpr,0,0);return[ctx,r.width,+c.getAttribute("height")];}
+function ejes(ctx,W,H,m,x0,x1,y0,y1,xt,yt,xl,yl){
+  ctx.strokeStyle=css("--line");ctx.fillStyle=css("--muted");ctx.font="12px "+css("--mono");ctx.lineWidth=1;
+  const sx=v=>m.l+(v-x0)/(x1-x0)*(W-m.l-m.r),sy=v=>H-m.b-(v-y0)/(y1-y0)*(H-m.t-m.b);
+  yt.forEach(v=>{ctx.beginPath();ctx.moveTo(m.l,sy(v));ctx.lineTo(W-m.r,sy(v));ctx.stroke();ctx.textAlign="right";ctx.fillText(v.toFixed(yl),m.l-6,sy(v)+4);});
+  xt.forEach(v=>{ctx.textAlign="center";ctx.fillText(v.toFixed(xl),sx(v),H-m.b+16);});
+  return[sx,sy];
+}
+function linea(ctx,sx,sy,a,b,x0,x1,col,dash,w){ctx.strokeStyle=col;ctx.setLineDash(dash);ctx.lineWidth=w;ctx.beginPath();ctx.moveTo(sx(x0),sy(a+b*x0));ctx.lineTo(sx(x1),sy(a+b*x1));ctx.stroke();ctx.setLineDash([]);}
+function render(){
+  const t=+$("tau").value,g=+$("gam").value,d=$("dist").value;
+  $("tauv").textContent=t.toFixed(2);$("gamv").textContent=g.toFixed(2);$("nv").textContent=$("n").value;
+  const [ao,bo]=ols(),[aq,bq]=qreg(t),z=qinv(d,t);const at=1+z,bt=0.5+g*z;
+  $("bols").textContent=bo.toFixed(3);$("bq").textContent=bq.toFixed(3);$("btrue").textContent=bt.toFixed(3);
+  // dispersión
+  let [ctx,W,H]=prep($("sc"));ctx.clearRect(0,0,W,H);
+  let lo=Math.min(...Y),hi=Math.max(...Y);lo=Math.floor(lo/2)*2;hi=Math.ceil(hi/2)*2;
+  const yt=[];const step=Math.max(2,Math.round((hi-lo)/6/2)*2);for(let v=lo;v<=hi;v+=step)yt.push(v);
+  const m={l:40,r:10,t:10,b:26};const [sx,sy]=ejes(ctx,W,H,m,0,10,lo,hi,[0,2,4,6,8,10],yt,0,0);
+  ctx.fillStyle=css("--pt");for(let i=0;i<X.length;i++){ctx.beginPath();ctx.arc(sx(X[i]),sy(Y[i]),2.2,0,7);ctx.fill();}
+  linea(ctx,sx,sy,at,bt,0,10,css("--acc3"),[2,4],2);
+  linea(ctx,sx,sy,ao,bo,0,10,css("--acc2"),[7,5],2.2);
+  linea(ctx,sx,sy,aq,bq,0,10,css("--acc"),[],2.6);
+  // pendiente por cuantil
+  [ctx,W,H]=prep($("cf"));ctx.clearRect(0,0,W,H);
+  const T=[],E=[],V=[];for(let k=5;k<=95;k+=5){const tt=k/100;T.push(tt);E.push(qreg(tt)[1]);V.push(0.5+g*qinv(d,tt));}
+  let l2=Math.min(...E,...V,bo),h2=Math.max(...E,...V,bo);const pad=Math.max(0.05,(h2-l2)*0.15);l2-=pad;h2+=pad;
+  const yt2=[];for(let i=0;i<=4;i++)yt2.push(l2+(h2-l2)*i/4);
+  const m2={l:52,r:10,t:10,b:26};const [sx2,sy2]=ejes(ctx,W,H,m2,0,1,l2,h2,[0.1,0.3,0.5,0.7,0.9],yt2,1,2);
+  ctx.strokeStyle=css("--acc2");ctx.setLineDash([7,5]);ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(sx2(0),sy2(bo));ctx.lineTo(sx2(1),sy2(bo));ctx.stroke();ctx.setLineDash([]);
+  const path=(arr,col,dash,w)=>{ctx.strokeStyle=col;ctx.setLineDash(dash);ctx.lineWidth=w;ctx.beginPath();arr.forEach((v,i)=>{const p=[sx2(T[i]),sy2(v)];i?ctx.lineTo(...p):ctx.moveTo(...p);});ctx.stroke();ctx.setLineDash([]);};
+  path(V,css("--acc3"),[2,4],2);path(E,css("--acc"),[],2.6);
+  ctx.fillStyle=css("--acc");const i0=T.findIndex(v=>Math.abs(v-t)<1e-9);if(i0>=0){ctx.beginPath();ctx.arc(sx2(T[i0]),sy2(E[i0]),5,0,7);ctx.fill();}
+}
+["tau","gam","n","dist"].forEach(id=>$(id).addEventListener("input",()=>{if(id!=="tau")simular();render();}));
+$("nueva").addEventListener("click",()=>{seed=Math.floor(Math.random()*1e9);simular();render();});
+window.addEventListener("resize",render);
+if(window.matchMedia)matchMedia("(prefers-color-scheme: dark)").addEventListener("change",render);
+simular();render();
+</script>

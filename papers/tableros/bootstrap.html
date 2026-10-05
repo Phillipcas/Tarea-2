@@ -1,0 +1,129 @@
+<title>Laboratorio de bootstrap</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=IBM+Plex+Sans:wght@400;500&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+:root{--bg:#f4f5f8;--panel:#fff;--ink:#1b2130;--muted:#5b6475;--line:#d8dce5;--acc:#1f3a68;--acc2:#c8702a;--acc3:#2e6b34;--acc4:#8e2432;--bar:rgba(31,58,104,.35);
+--serif:"Source Serif 4",Georgia,serif;--sans:"IBM Plex Sans",system-ui,sans-serif;--mono:"IBM Plex Mono",ui-monospace,monospace}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#11141b;--panel:#181c25;--ink:#e4e8f0;--muted:#9aa3b5;--line:#2c3342;--acc:#8fb0ea;--acc2:#e79a5f;--acc3:#7fc187;--acc4:#e0808f;--bar:rgba(143,176,234,.35);color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#11141b;--panel:#181c25;--ink:#e4e8f0;--muted:#9aa3b5;--line:#2c3342;--acc:#8fb0ea;--acc2:#e79a5f;--acc3:#7fc187;--acc4:#e0808f;--bar:rgba(143,176,234,.35);color-scheme:dark}
+body{background:var(--bg);color:var(--ink);font:15px/1.6 var(--sans);padding-inline:16px;padding-block:24px 40px}
+.wrap{max-width:1080px;margin:0 auto;display:grid;gap:22px}
+h1{font:600 clamp(26px,4vw,36px)/1.15 var(--serif);margin:0;text-wrap:balance}
+h2{font:600 20px/1.3 var(--serif);margin:0 0 8px}
+.lead{color:var(--muted);max-width:70ch;margin:6px 0 0}
+.grid{display:grid;grid-template-columns:minmax(0,300px) minmax(0,1fr);gap:22px}
+@media (max-width:820px){.grid{grid-template-columns:1fr}}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:18px}
+.ctl{display:grid;gap:6px;margin-bottom:14px}
+.ctl label{font-size:13px;color:var(--muted);display:flex;justify-content:space-between}
+.ctl label b{font:500 13px var(--mono);color:var(--ink)}
+input[type=range]{width:100%;accent-color:var(--acc)}
+select,button{font:inherit;padding:6px 10px;border:1px solid var(--line);border-radius:6px;background:var(--panel);color:var(--ink)}
+button{cursor:pointer}button:hover{border-color:var(--acc)}
+button:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+.btns{display:flex;flex-wrap:wrap;gap:8px}
+canvas{width:100%;display:block}
+.tw{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:14px;font-variant-numeric:tabular-nums}
+th,td{padding:6px 8px;text-align:right;border-bottom:1px solid var(--line);white-space:nowrap}
+th:first-child,td:first-child{text-align:left}
+th{font-weight:500;color:var(--muted);font-size:12.5px}
+td{font-family:var(--mono);font-size:13px}td:first-child{font-family:var(--sans)}
+.sw{display:inline-block;width:12px;height:12px;border-radius:2px;margin-right:6px;vertical-align:-1px}
+.pill{font:500 12px var(--mono);padding:2px 7px;border-radius:10px;border:1px solid var(--line)}
+.ok{color:var(--acc3);border-color:var(--acc3)}.bad{color:var(--acc4);border-color:var(--acc4)}
+.cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:22px}
+.cols p{margin:0 0 8px;max-width:65ch}
+#prog{font-size:13px;color:var(--muted)}
+</style>
+<div class="wrap">
+<header>
+  <h1>Laboratorio de bootstrap</h1>
+  <p class="lead">El bootstrap aproxima la distribución muestral de un estimador remuestreando con reemplazo la propia muestra. Elige un estadístico, genera una muestra de una población con salarios sesgados y compara el error estándar y el intervalo al 95% de cinco métodos. Con “Simular cobertura” se repite todo cientos de veces para ver qué tan seguido cada intervalo contiene el valor verdadero.</p>
+</header>
+<div class="grid">
+<aside class="panel" aria-label="Controles">
+  <div class="ctl"><label for="est">Estadístico</label>
+    <select id="est"><option value="media">Media del salario</option><option value="mediana">Mediana del salario</option><option value="pend">Pendiente de regresión (escolaridad)</option></select></div>
+  <div class="ctl"><label for="n">Tamaño de muestra n <b id="nv">100</b></label><input id="n" type="range" min="20" max="500" step="10" value="100"></div>
+  <div class="ctl"><label for="B">Repeticiones B <b id="Bv">1000</b></label><input id="B" type="range" min="100" max="3000" step="100" value="1000"></div>
+  <div class="btns"><button id="nueva" type="button">Nueva muestra</button><button id="cob" type="button">Simular cobertura</button></div>
+  <p id="prog" aria-live="polite"></p>
+  <p style="font-size:13px;color:var(--muted);margin:6px 0 0">Población: salario log-normal (mediana 55, media 65 pesos por hora). En la regresión, log(salario) = 2 + 0.08·escolaridad + error, con varianza que crece con la escolaridad.</p>
+</aside>
+<section class="panel" aria-label="Distribución bootstrap">
+  <h2>Distribución bootstrap del estimador</h2>
+  <canvas id="hist" height="300" role="img" aria-label="Histograma de las réplicas bootstrap con los intervalos de confianza"></canvas>
+  <div class="tw"><table id="tab"><thead><tr><th>Método</th><th>E.E.</th><th>IC inferior</th><th>IC superior</th><th>Contiene el valor verdadero</th><th>Cobertura simulada</th></tr></thead><tbody></tbody></table></div>
+</section>
+</div>
+<section class="cols">
+  <div><h2>Normal y percentil</h2><p><b>Normal:</b> usa el error estándar bootstrap (desviación estándar de las réplicas) y el intervalo θ̂ ± 1.96·EE. <b>Percentil:</b> toma directamente los cuantiles 2.5 y 97.5 de las réplicas θ̂*; no supone normalidad, pero hereda el sesgo del estimador.</p></div>
+  <div><h2>Percentil-t</h2><p>En cada réplica calcula t* = (θ̂* − θ̂)/EE*. El intervalo es [θ̂ − t*<sub>0.975</sub>·EE, θ̂ − t*<sub>0.025</sub>·EE]. Al estandarizar, suele tener mejor cobertura con distribuciones sesgadas y muestras chicas. Para la mediana, EE* se obtiene con un bootstrap anidado de 25 réplicas.</p></div>
+  <div><h2>Jackknife y m de n</h2><p><b>Jackknife:</b> recalcula el estimador dejando fuera una observación a la vez; es exacto para estadísticos suaves, pero falla con la mediana. <b>Bootstrap m de n:</b> remuestrea m = n/4 observaciones y reescala por √(m/n); sirve cuando el bootstrap usual no es consistente.</p></div>
+</section>
+</div>
+<script>
+const $=id=>document.getElementById(id);
+let seed=11;function rnd(){seed=(seed*1664525+1013904223)%4294967296;return seed/4294967296;}
+function norm(){let u=0,v=0;while(u===0)u=rnd();while(v===0)v=rnd();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);}
+const MU=Math.log(55),SG=0.55,TRUE={media:Math.exp(MU+SG*SG/2),mediana:55,pend:0.08};
+const MET=[["Normal (EE bootstrap)","--acc"],["Percentil","--acc2"],["Percentil-t","--acc3"],["Jackknife","--acc4"],["Bootstrap m de n","--muted"]];
+function muestra(n){const w=[],e=[];for(let i=0;i<n;i++){const ed=6+Math.floor(rnd()*12);e.push(ed);w.push(Math.exp(MU+SG*norm()));}
+  const ly=[];for(let i=0;i<n;i++)ly.push(2+0.08*e[i]+(0.15+0.03*e[i])*norm());return{w,e,ly};}
+function mean(a){let s=0;for(const v of a)s+=v;return s/a.length;}
+function med(a){const b=a.slice().sort((x,y)=>x-y),m=b.length>>1;return b.length%2?b[m]:(b[m-1]+b[m])/2;}
+function sd(a){const m=mean(a);let s=0;for(const v of a)s+=(v-m)*(v-m);return Math.sqrt(s/(a.length-1));}
+function q(a,p){const b=a.slice().sort((x,y)=>x-y);const h=(b.length-1)*p,l=Math.floor(h);return b[l]+(b[Math.min(l+1,b.length-1)]-b[l])*(h-l);}
+function ols(x,y){const n=x.length,mx=mean(x),my=mean(y);let sxx=0,sxy=0;for(let i=0;i<n;i++){sxx+=(x[i]-mx)**2;sxy+=(x[i]-mx)*(y[i]-my);}const b=sxy/sxx,a=my-b*mx;let v=0;for(let i=0;i<n;i++){const r=y[i]-a-b*x[i];v+=(x[i]-mx)**2*r*r;}return{b,se:Math.sqrt(v)/sxx};}
+function stat(tipo,d,idx){ // devuelve [θ, EE analítico o null]
+  const n=idx.length;
+  if(tipo==="media"){const a=idx.map(i=>d.w[i]);return[mean(a),sd(a)/Math.sqrt(n)];}
+  if(tipo==="mediana"){const a=idx.map(i=>d.w[i]);return[med(a),null];}
+  const r=ols(idx.map(i=>d.e[i]),idx.map(i=>d.ly[i]));return[r.b,r.se];}
+function draws(n,m){const idx=new Array(m);for(let i=0;i<m;i++)idx[i]=Math.floor(rnd()*n);return idx;}
+function seMed(d,idx){const r=[];for(let k=0;k<25;k++){const j=draws(idx.length,idx.length).map(t=>idx[t]);r.push(med(j.map(i=>d.w[i])));}return sd(r);}
+function analiza(tipo,d,B){
+  const n=d.w.length,all=[...Array(n).keys()];
+  let [th,se0]=stat(tipo,d,all);if(se0===null)se0=seMed(d,all);
+  const bs=[],ts=[],bm=[],m=Math.max(5,Math.floor(n/4));
+  for(let b=0;b<B;b++){const idx=draws(n,n);let [t,s]=stat(tipo,d,idx);if(s===null)s=seMed(d,idx);bs.push(t);ts.push((t-th)/s);
+    const im=draws(n,m);bm.push(stat(tipo,d,im)[0]);}
+  const seb=sd(bs);
+  const jk=[];for(let i=0;i<n;i++){const idx=all.filter(j=>j!==i);jk.push(stat(tipo,d,idx)[0]);}
+  const jm=mean(jk);let sj=0;for(const v of jk)sj+=(v-jm)**2;sj=Math.sqrt((n-1)/n*sj);
+  const r=Math.sqrt(m/n),dm=bm.map(v=>r*(v-th));
+  return{th,bs,res:[
+    [seb,th-1.96*seb,th+1.96*seb],
+    [seb,q(bs,.025),q(bs,.975)],
+    [se0,th-q(ts,.975)*se0,th-q(ts,.025)*se0],
+    [sj,th-1.96*sj,th+1.96*sj],
+    [sd(bm)*r,th-q(dm,.975),th-q(dm,.025)]]};
+}
+let D=null,R=null,COB=null;
+function css(v){return getComputedStyle(document.documentElement).getPropertyValue(v).trim();}
+function fmt(v){const t=$("est").value;return t==="pend"?v.toFixed(4):v.toFixed(2);}
+function tabla(){const tb=document.querySelector("#tab tbody"),t=TRUE[$("est").value];tb.innerHTML="";
+  R.res.forEach((r,k)=>{const ok=r[1]<=t&&t<=r[2];const c=COB?(100*COB[k]).toFixed(1)+"%":"–";
+    tb.insertAdjacentHTML("beforeend",`<tr><td><span class="sw" style="background:${css(MET[k][1])}"></span>${MET[k][0]}</td><td>${fmt(r[0])}</td><td>${fmt(r[1])}</td><td>${fmt(r[2])}</td><td><span class="pill ${ok?"ok":"bad"}">${ok?"sí":"no"}</span></td><td>${c}</td></tr>`);});}
+function hist(){const c=$("hist"),rc=c.getBoundingClientRect(),dpr=window.devicePixelRatio||1,H=300;c.width=rc.width*dpr;c.height=H*dpr;const x=c.getContext("2d");x.setTransform(dpr,0,0,dpr,0,0);const W=rc.width;x.clearRect(0,0,W,H);
+  const v=R.bs,t=TRUE[$("est").value];let lo=Math.min(...v,...R.res.map(r=>r[1]),t),hi=Math.max(...v,...R.res.map(r=>r[2]),t);const pad=(hi-lo)*.05;lo-=pad;hi+=pad;
+  const m={l:14,r:14,t:10,b:118},sx=u=>m.l+(u-lo)/(hi-lo)*(W-m.l-m.r);const nb=40,cnt=new Array(nb).fill(0);v.forEach(u=>{cnt[Math.min(nb-1,Math.floor((u-lo)/(hi-lo)*nb))]++;});const mx=Math.max(...cnt);
+  const base=H-m.b;x.fillStyle=css("--bar");cnt.forEach((k,i)=>{const h=k/mx*(base-m.t);x.fillRect(sx(lo+i*(hi-lo)/nb)+1,base-h,(W-m.l-m.r)/nb-2,h);});
+  x.strokeStyle=css("--line");x.beginPath();x.moveTo(m.l,base);x.lineTo(W-m.r,base);x.stroke();
+  x.fillStyle=css("--muted");x.font="12px "+css("--mono");x.textAlign="center";[0,.25,.5,.75,1].forEach(p=>{const u=lo+(hi-lo)*p;x.fillText(fmt(u),sx(u),base+15);});
+  R.res.forEach((r,k)=>{const y=base+32+k*17;x.strokeStyle=css(MET[k][1]);x.lineWidth=3;x.beginPath();x.moveTo(sx(r[1]),y);x.lineTo(sx(r[2]),y);x.stroke();});
+  x.strokeStyle=css("--ink");x.lineWidth=1.5;x.setLineDash([4,3]);x.beginPath();x.moveTo(sx(t),m.t);x.lineTo(sx(t),H-8);x.stroke();x.setLineDash([]);
+  x.fillStyle=css("--ink");x.textAlign="left";x.font="12px "+css("--sans");x.fillText("valor verdadero",Math.min(sx(t)+5,W-100),m.t+12);}
+function calc(){$("nv").textContent=$("n").value;$("Bv").textContent=$("B").value;R=analiza($("est").value,D,+$("B").value);tabla();hist();}
+function nueva(){D=muestra(+$("n").value);COB=null;calc();}
+$("nueva").addEventListener("click",nueva);
+["est","B"].forEach(id=>$(id).addEventListener("change",()=>{COB=null;calc();}));
+$("n").addEventListener("input",()=>{$("nv").textContent=$("n").value;});$("n").addEventListener("change",nueva);
+$("B").addEventListener("input",()=>{$("Bv").textContent=$("B").value;});
+$("cob").addEventListener("click",()=>{const S=150,tipo=$("est").value,n=+$("n").value,B=Math.min(400,+$("B").value),t=TRUE[tipo];const hits=[0,0,0,0,0];let s=0;$("cob").disabled=true;
+  (function paso(){for(let k=0;k<5&&s<S;k++,s++){const r=analiza(tipo,muestra(n),B);r.res.forEach((c,j)=>{if(c[1]<=t&&t<=c[2])hits[j]++;});}
+    $("prog").textContent=`Simulación: ${s} de ${S} muestras (B = ${B} por muestra)`;
+    if(s<S)setTimeout(paso,0);else{COB=hits.map(h=>h/S);$("cob").disabled=false;$("prog").textContent=`Cobertura con ${S} muestras de tamaño ${n}; la nominal es 95%.`;tabla();}})();});
+window.addEventListener("resize",()=>R&&hist());
+nueva();
+</script>

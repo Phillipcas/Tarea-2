@@ -1,0 +1,124 @@
+<title>Laboratorio de imputación de ingresos</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=IBM+Plex+Sans:wght@400;500&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+:root{--bg:#f4f5f8;--panel:#fff;--ink:#1b2130;--muted:#5b6475;--line:#d8dce5;--acc:#1f3a68;--acc2:#c8702a;--good:#2e6b34;--bad:#8e2432;--bar:rgba(31,58,104,.30);--bar2:rgba(200,112,42,.45);
+--serif:"Source Serif 4",Georgia,serif;--sans:"IBM Plex Sans",system-ui,sans-serif;--mono:"IBM Plex Mono",ui-monospace,monospace}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#11141b;--panel:#181c25;--ink:#e4e8f0;--muted:#9aa3b5;--line:#2c3342;--acc:#8fb0ea;--acc2:#e79a5f;--good:#7fc187;--bad:#e0808f;--bar:rgba(143,176,234,.30);--bar2:rgba(231,154,95,.45);color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#11141b;--panel:#181c25;--ink:#e4e8f0;--muted:#9aa3b5;--line:#2c3342;--acc:#8fb0ea;--acc2:#e79a5f;--good:#7fc187;--bad:#e0808f;--bar:rgba(143,176,234,.30);--bar2:rgba(231,154,95,.45);color-scheme:dark}
+body{background:var(--bg);color:var(--ink);font:15px/1.6 var(--sans);padding-inline:16px;padding-block:24px 40px}
+.wrap{max-width:1100px;margin:0 auto;display:grid;gap:22px}
+h1{font:600 clamp(26px,4vw,36px)/1.15 var(--serif);margin:0;text-wrap:balance}
+h2{font:600 20px/1.3 var(--serif);margin:0 0 8px}
+.lead{color:var(--muted);max-width:72ch;margin:6px 0 0}
+.grid{display:grid;grid-template-columns:minmax(0,300px) minmax(0,1fr);gap:22px}
+@media (max-width:840px){.grid{grid-template-columns:1fr}}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:18px}
+.ctl{display:grid;gap:6px;margin-bottom:14px}
+.ctl label{font-size:13px;color:var(--muted);display:flex;justify-content:space-between}
+.ctl label b{font:500 13px var(--mono);color:var(--ink)}
+input[type=range]{width:100%;accent-color:var(--acc)}
+select,button{font:inherit;padding:6px 10px;border:1px solid var(--line);border-radius:6px;background:var(--panel);color:var(--ink)}
+button{cursor:pointer}button:hover{border-color:var(--acc)}
+button:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+.tw{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:14px;font-variant-numeric:tabular-nums}
+th,td{padding:6px 8px;text-align:right;border-bottom:1px solid var(--line);white-space:nowrap}
+th:first-child,td:first-child{text-align:left}
+th{font-weight:500;color:var(--muted);font-size:12.5px}
+td{font-family:var(--mono);font-size:13px}td:first-child{font-family:var(--sans)}
+tr.true td{font-weight:500;background:var(--bg)}
+tr.sel td{outline:1px solid var(--acc);outline-offset:-1px}
+tbody tr{cursor:pointer}
+.b-good{color:var(--good)}.b-bad{color:var(--bad)}
+canvas{width:100%;display:block}
+.key{display:flex;flex-wrap:wrap;gap:14px;font-size:13px;color:var(--muted);margin-top:6px}
+.sw{display:inline-block;width:12px;height:12px;border-radius:2px;margin-right:6px;vertical-align:-1px}
+.cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:22px}
+.cols p{margin:0 0 8px;max-width:65ch}
+</style>
+<div class="wrap">
+<header>
+  <h1>Laboratorio de imputación de ingresos</h1>
+  <p class="lead">Una población simulada de 4,000 trabajadores, parecida a la ENOE: escolaridad, formalidad e ingreso laboral mensual. Una parte no declara su ingreso. Elige el mecanismo de no respuesta y el porcentaje de faltantes, y compara qué tan cerca del valor verdadero quedan la media, la varianza, el coeficiente de Gini y la pobreza con cada método. Haz clic en un renglón para ver su distribución.</p>
+</header>
+<div class="grid">
+<aside class="panel" aria-label="Controles">
+  <div class="ctl"><label for="pct">Porcentaje que no declara <b id="pctv">30%</b></label><input id="pct" type="range" min="5" max="60" step="5" value="30"></div>
+  <div class="ctl"><label for="mec">Mecanismo de no respuesta</label>
+    <select id="mec"><option value="mcar">MCAR: completamente al azar</option><option value="mar" selected>MAR: depende de escolaridad y formalidad</option><option value="mnar">MNAR: depende del propio ingreso</option></select></div>
+  <div class="ctl"><label for="lin">Línea de pobreza (pesos al mes) <b id="linv">4,000</b></label><input id="lin" type="range" min="2000" max="9000" step="250" value="4000"></div>
+  <button id="nueva" type="button">Nueva población</button>
+  <p style="font-size:13px;color:var(--muted);margin:12px 0 0">Con MAR, los universitarios y los formales dejan de responder más seguido, como en la ENOE. Con MNAR, la probabilidad de no responder crece con el ingreso aun dentro de cada grupo: ningún método basado en observables corrige ese sesgo.</p>
+</aside>
+<section class="panel" aria-label="Resultados por método">
+  <h2>Estadísticos con cada método</h2>
+  <div class="tw"><table id="tab"><thead><tr><th>Método</th><th>Media</th><th>Sesgo media</th><th>Desv. est.</th><th>Gini</th><th>Pobreza</th><th>Sesgo pobreza</th></tr></thead><tbody></tbody></table></div>
+  <canvas id="hist" height="230" role="img" aria-label="Distribución del ingreso verdadero y del ingreso con el método seleccionado"></canvas>
+  <div class="key"><span><span class="sw" style="background:var(--bar)"></span>Ingreso verdadero</span><span><span class="sw" style="background:var(--bar2)"></span><span id="selname">Método seleccionado</span></span></div>
+</section>
+</div>
+<section class="cols">
+  <div><h2>Qué hace cada método</h2><p><b>Casos completos:</b> descarta a quien no declara. <b>Cero:</b> asigna ingreso nulo, como hacía la medición de pobreza laboral antes de usar rangos de salarios mínimos. <b>Media y media por grupo:</b> rellenan con un promedio; aciertan la media si la no respuesta es MAR por grupo, pero reducen la varianza y crean picos.</p></div>
+  <div><h2>Métodos con variabilidad</h2><p><b>Hot-deck:</b> asigna el ingreso de un donador al azar del mismo grupo. <b>Mediana + ruido:</b> mediana del grupo más un error normal con la desviación del grupo. <b>Regresión + ruido (5 imputaciones):</b> predice el log del ingreso y añade un residuo aleatorio; se promedian cinco imputaciones, como en la imputación múltiple de Rubin.</p></div>
+  <div><h2>Implicaciones</h2><p>Si el porcentaje de faltantes crece y la no respuesta se concentra en grupos de ingreso alto, ignorarla o poner ceros subestima el ingreso y sobreestima la pobreza, y el sesgo aumenta con el tiempo. La imputación corrige ese sesgo bajo MAR; bajo MNAR solo lo reduce.</p></div>
+</section>
+</div>
+<script>
+const $=id=>document.getElementById(id);
+let seed=5;function rnd(){seed=(seed*1664525+1013904223)%4294967296;return seed/4294967296;}
+function norm(){let u=0,v=0;while(u===0)u=rnd();while(v===0)v=rnd();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);}
+const N=4000,EDN=["Primaria o menos","Secundaria","Preparatoria","Universidad"];
+let P=[];
+function poblacion(){P=[];for(let i=0;i<N;i++){const r=rnd();const ed=r<.3?0:r<.6?1:r<.82?2:3;const fo=rnd()<(0.25+0.15*ed)?1:0;
+  const ly=Math.log(6000)+0.28*ed+0.25*fo+0.5*norm();P.push({ed,fo,y:Math.exp(ly),ly});}}
+function faltantes(){const pct=+$("pct").value/100,mec=$("mec").value;let s=P.map(p=>{let z;if(mec==="mcar")z=0;else if(mec==="mar")z=0.55*p.ed+0.6*p.fo;else z=1.2*(p.ly-Math.log(6000));return z+norm()*0.8;});
+  const o=s.map((v,i)=>[v,i]).sort((a,b)=>b[0]-a[0]);const k=Math.round(pct*N);const m=new Array(N).fill(false);for(let j=0;j<k;j++)m[o[j][1]]=true;return m;}
+function mean(a){let s=0;for(const v of a)s+=v;return s/a.length;}
+function sd(a){const m=mean(a);let s=0;for(const v of a)s+=(v-m)**2;return Math.sqrt(s/(a.length-1));}
+function gini(a){const b=a.slice().sort((x,y)=>x-y),n=b.length;let s=0,t=0;for(let i=0;i<n;i++){s+=(i+1)*b[i];t+=b[i];}return (2*s)/(n*t)-(n+1)/n;}
+function med(a){const b=a.slice().sort((x,y)=>x-y),m=b.length>>1;return b.length%2?b[m]:(b[m-1]+b[m])/2;}
+function grupo(p){return p.ed*2+p.fo;}
+function metodos(M){
+  const obs=P.filter((p,i)=>!M[i]),res={};const G={};obs.forEach(p=>{(G[grupo(p)]=G[grupo(p)]||[]).push(p.y);});
+  const gm={},gmed={},gsd={};for(const g in G){gm[g]=mean(G[g]);gmed[g]=med(G[g]);gsd[g]=sd(G[g]);}
+  const mu=mean(obs.map(p=>p.y));
+  // regresión log(y) ~ ed + fo por MCO con ecuaciones normales 3x3
+  const X=obs.map(p=>[1,p.ed,p.fo]),Y=obs.map(p=>p.ly);const A=[[0,0,0],[0,0,0],[0,0,0]],b=[0,0,0];X.forEach((x,i)=>{for(let r=0;r<3;r++){b[r]+=x[r]*Y[i];for(let c=0;c<3;c++)A[r][c]+=x[r]*x[c];}});
+  const sol=(A,b)=>{const m=A.map((r,i)=>[...r,b[i]]);for(let i=0;i<3;i++){let p=i;for(let r=i+1;r<3;r++)if(Math.abs(m[r][i])>Math.abs(m[p][i]))p=r;[m[i],m[p]]=[m[p],m[i]];for(let r=0;r<3;r++)if(r!==i){const f=m[r][i]/m[i][i];for(let c=i;c<4;c++)m[r][c]-=f*m[i][c];}}return m.map((r,i)=>r[3]/r[i]);};
+  const be=sol(A,b);const res2=Y.map((y,i)=>y-(be[0]+be[1]*X[i][1]+be[2]*X[i][2]));const s2=Math.sqrt(res2.reduce((a,v)=>a+v*v,0)/(Y.length-3));
+  res["Verdadero"]=[P.map(p=>p.y)];
+  res["Casos completos"]=[obs.map(p=>p.y)];
+  res["Cero"]=[P.map((p,i)=>M[i]?0:p.y)];
+  res["Media general"]=[P.map((p,i)=>M[i]?mu:p.y)];
+  res["Media por grupo"]=[P.map((p,i)=>M[i]?gm[grupo(p)]:p.y)];
+  const hd=[],mr=[],rg=[];
+  for(let k=0;k<5;k++){hd.push(P.map((p,i)=>{if(!M[i])return p.y;const d=G[grupo(p)];return d[Math.floor(rnd()*d.length)];}));
+    mr.push(P.map((p,i)=>{if(!M[i])return p.y;const g=grupo(p);let v=gmed[g]+gsd[g]*norm();let t=0;while(v<=0&&t<5){v=gmed[g]+gsd[g]*norm();t++;}return v>0?v:gmed[g];}));
+    rg.push(P.map((p,i)=>M[i]?Math.exp(be[0]+be[1]*p.ed+be[2]*p.fo+s2*norm()):p.y));}
+  res["Hot-deck por grupo (5)"]=hd;res["Mediana por grupo + ruido (5)"]=mr;res["Regresión + ruido (5)"]=rg;
+  return res;
+}
+let R=null,SEL="Hot-deck por grupo (5)";
+function stats(reps,lin){const f=a=>[mean(a),sd(a),gini(a),100*a.filter(v=>v<lin).length/a.length];const s=reps.map(f);return s[0].map((_,j)=>mean(s.map(r=>r[j])));}
+function css(v){return getComputedStyle(document.documentElement).getPropertyValue(v).trim();}
+function render(){const lin=+$("lin").value;$("linv").textContent=lin.toLocaleString("es-MX");$("pctv").textContent=$("pct").value+"%";
+  const tb=document.querySelector("#tab tbody");tb.innerHTML="";const T=stats(R["Verdadero"],lin);
+  for(const k in R){const s=stats(R[k],lin);const bm=100*(s[0]/T[0]-1),bp=s[3]-T[3];const cls=v=>Math.abs(v)<1?"b-good":"b-bad";
+    const tr=document.createElement("tr");if(k==="Verdadero")tr.className="true";if(k===SEL)tr.classList.add("sel");
+    tr.innerHTML=`<td>${k}</td><td>${Math.round(s[0]).toLocaleString("es-MX")}</td><td class="${k==="Verdadero"?"":cls(bm)}">${k==="Verdadero"?"–":(bm>0?"+":"")+bm.toFixed(1)+"%"}</td><td>${Math.round(s[1]).toLocaleString("es-MX")}</td><td>${s[2].toFixed(3)}</td><td>${s[3].toFixed(1)}%</td><td class="${k==="Verdadero"?"":cls(bp)}">${k==="Verdadero"?"–":(bp>0?"+":"")+bp.toFixed(1)+" pp"}</td>`;
+    if(k!=="Verdadero")tr.addEventListener("click",()=>{SEL=k;render();});tb.appendChild(tr);}
+  $("selname").textContent=SEL;hist();}
+function hist(){const c=$("hist"),rc=c.getBoundingClientRect(),dpr=window.devicePixelRatio||1,H=230;c.width=rc.width*dpr;c.height=H*dpr;const x=c.getContext("2d");x.setTransform(dpr,0,0,dpr,0,0);const W=rc.width;x.clearRect(0,0,W,H);
+  const lo=0,hi=30000,nb=50,m={l:10,r:10,t:14,b:24},bw=(W-m.l-m.r)/nb;const h=a=>{const c=new Array(nb).fill(0);a.forEach(v=>{if(v>=lo&&v<hi)c[Math.floor((v-lo)/(hi-lo)*nb)]++;});return c.map(k=>k/a.length);};
+  const t=h(R["Verdadero"][0]),s=h(R[SEL][0]);const mx=Math.max(...t,...s);const base=H-m.b;
+  x.fillStyle=css("--bar");t.forEach((k,i)=>{const hh=k/mx*(base-m.t);x.fillRect(m.l+i*bw,base-hh,bw-1,hh);});
+  x.fillStyle=css("--bar2");s.forEach((k,i)=>{const hh=k/mx*(base-m.t);x.fillRect(m.l+i*bw+bw*0.3,base-hh,bw*0.4,hh);});
+  x.fillStyle=css("--muted");x.font="12px "+css("--mono");x.textAlign="center";[0,10000,20000,30000].forEach(v=>x.fillText(v.toLocaleString("es-MX"),m.l+(v-lo)/(hi-lo)*(W-m.l-m.r),H-6));
+  const lin=+$("lin").value,xl=m.l+(lin-lo)/(hi-lo)*(W-m.l-m.r);x.strokeStyle=css("--bad");x.setLineDash([4,3]);x.beginPath();x.moveTo(xl,m.t);x.lineTo(xl,base);x.stroke();x.setLineDash([]);
+  x.fillStyle=css("--bad");x.textAlign="left";x.font="12px "+css("--sans");x.fillText("línea de pobreza",xl+4,m.t+10);}
+function recalcula(){R=metodos(faltantes());render();}
+$("nueva").addEventListener("click",()=>{seed=Math.floor(Math.random()*1e9);poblacion();recalcula();});
+["pct","mec"].forEach(id=>$(id).addEventListener("input",recalcula));
+$("lin").addEventListener("input",render);window.addEventListener("resize",()=>R&&hist());
+poblacion();recalcula();
+</script>
